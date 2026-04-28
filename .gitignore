@@ -31,3 +31,4 @@ data/embeddings_cache/
 # Extra security for json
 credentials*.json
 *token.json
+*.mp4
