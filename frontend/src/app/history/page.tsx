@@ -50,7 +50,7 @@ export default function History() {
               <span className="material-symbols-outlined text-lg">ios_share</span>
               Export PDF
             </button>
-            <button onClick={() => window.open('https://docs.google.com/document/u/0/', '_blank` )} className="px-5 py-2.5 rounded-xl border-none bg-secondary-container text-primary font-bold flex items-center gap-2 hover:bg-primary hover:text-white transition-all">
+            <button onClick={() => window.open('https://docs.google.com/document/u/0/', '_blank')} className="px-5 py-2.5 rounded-xl border-none bg-secondary-container text-primary font-bold flex items-center gap-2 hover:bg-primary hover:text-white transition-all">
               <span className="material-symbols-outlined text-lg">description</span>
               View in Docs
             </button>

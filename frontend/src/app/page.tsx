@@ -153,7 +153,7 @@ export default function Dashboard() {
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
                     <span className="text-label-md font-bold opacity-90">Pipeline Running...</span>
                   </>
-                ) : pipelineStatus?.status_message?.includes('Success` ) ? (
+                ) : pipelineStatus?.status_message?.includes('Success') ? (
                   <>
                     <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                     <span className="text-label-md font-bold opacity-90">Last run: Success ✓</span>
