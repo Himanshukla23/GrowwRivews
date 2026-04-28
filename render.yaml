@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: groww-review-api
+    env: docker
+    plan: free
+    branch: main
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_API_KEY_2
+        sync: false
+      - key: GOOGLE_DOC_ID
+        sync: false
+      - key: RECIPIENT_EMAIL
+        sync: false
+      - key: PRODUCT_NAME
+        value: "Groww"
+      - key: PLAY_STORE_ID
+        value: "com.nextbillion.groww"
+      - key: APP_STORE_ID
+        value: "1404871703"
