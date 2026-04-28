@@ -4,9 +4,33 @@ from pydantic import BaseModel
 import subprocess
 import os
 import datetime
+import json
+import base64
 from typing import Optional, List, Dict
 
 app = FastAPI(title="GrowwPulse API")
+
+@app.on_event("startup")
+def startup_event():
+    # Reconstruct Google Credentials from environment variables (used in Fly.io deployment)
+    if not os.path.exists("credentials.json") and "GOOGLE_CREDENTIALS_BASE64" in os.environ:
+        try:
+            creds_json = base64.b64decode(os.environ["GOOGLE_CREDENTIALS_BASE64"]).decode('utf-8')
+            with open("credentials.json", "w") as f:
+                f.write(creds_json)
+            print("[Startup] Reconstructed credentials.json from env var.")
+        except Exception as e:
+            print(f"[Startup] Failed to reconstruct credentials.json: {e}")
+            
+    os.makedirs("data", exist_ok=True)
+    if not os.path.exists("data/google_token.json") and "GOOGLE_TOKEN_BASE64" in os.environ:
+        try:
+            token_json = base64.b64decode(os.environ["GOOGLE_TOKEN_BASE64"]).decode('utf-8')
+            with open("data/google_token.json", "w") as f:
+                f.write(token_json)
+            print("[Startup] Reconstructed data/google_token.json from env var.")
+        except Exception as e:
+            print(f"[Startup] Failed to reconstruct data/google_token.json: {e}")
 
 # Allow requests from Vercel frontend
 app.add_middleware(
