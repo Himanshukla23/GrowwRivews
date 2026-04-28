@@ -12,6 +12,17 @@ def save_to_db(reviews: List[RawReview], db_path="data/audit_log.db"):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
+    # Ensure table exists
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS processed_reviews (
+            review_id TEXT PRIMARY KEY,
+            product_id TEXT,
+            rating INTEGER,
+            content TEXT,
+            review_date TEXT
+        )
+    """)
+    
     new_count = 0
     for r in reviews:
         sha1 = r.sha1_id
