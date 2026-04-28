@@ -11,8 +11,8 @@ export default function Pipeline() {
     const fetchData = async () => {
       try {
         const [healthRes, logsRes] = await Promise.all([
-          fetch('http://localhost:8000/api/pipeline/health'),
-          fetch('http://localhost:8000/api/pipeline/logs')
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/pipeline/health`),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/pipeline/logs` )
         ]);
         
         if (healthRes.ok) setHealth(await healthRes.json());
@@ -33,8 +33,8 @@ export default function Pipeline() {
     setLoading(true);
     try {
       const [healthRes, logsRes] = await Promise.all([
-        fetch('http://localhost:8000/api/pipeline/health'),
-        fetch('http://localhost:8000/api/pipeline/logs')
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/pipeline/health`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/pipeline/logs` )
       ]);
       if (healthRes.ok) setHealth(await healthRes.json());
       if (logsRes.ok) setLogs(await logsRes.json());
@@ -45,7 +45,7 @@ export default function Pipeline() {
 
   const handleStopPipeline = async () => {
     try {
-      await fetch('http://localhost:8000/api/stop-pipeline', { method: 'POST' });
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/stop-pipeline`, { method: 'POST' });
       handleRefresh();
     } catch (error) {
       console.error("Failed to stop pipeline:", error);
