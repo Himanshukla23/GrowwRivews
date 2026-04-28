@@ -1,0 +1,33 @@
+# Environment
+.env
+*.env
+
+# Google OAuth credentials (NEVER commit these)
+credentials.json
+data/google_token.json
+token.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Data & Cache
+data/
+*.db
+
+# IDE
+.vscode/
+.idea/
+
+# Embeddings cache
+data/embeddings_cache/
+
+# Extra security for json
+credentials*.json
+*token.json
