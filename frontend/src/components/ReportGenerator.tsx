@@ -84,9 +84,9 @@ export function ReportGenerator() {
             <div className="flex items-center gap-2 text-sm">
               {status?.is_running ? (
                 <><Loader2 className="w-4 h-4 animate-spin text-blue-600" /><span className="text-blue-600 font-medium">Running</span></>
-              ) : status?.status_message?.includes('Success` ) ? (
+              ) : status?.status_message?.includes('Success') ? (
                 <><CheckCircle2 className="w-4 h-4 text-emerald-600" /><span className="text-emerald-600 font-medium">Completed</span></>
-              ) : status?.status_message?.includes('Failed` ) || status?.status_message?.includes('Error` ) ? (
+              ) : status?.status_message?.includes('Failed') || status?.status_message?.includes('Error') ? (
                 <><AlertCircle className="w-4 h-4 text-rose-600" /><span className="text-rose-600 font-medium">Failed</span></>
               ) : (
                 <span className="text-gray-500">Ready</span>
