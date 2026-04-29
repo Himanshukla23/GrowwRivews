@@ -60,7 +60,7 @@ class EmbeddingClient:
             genai.configure(api_key=gemini_key)
             self.use_gemini = True
             self.use_openai = False
-            self.model_name = "models/text-embedding-004"
+            self.model_name = "models/embedding-001"
             print("Using Gemini API for embeddings (zero local memory footprint)")
         else:
             self.use_openai = False
