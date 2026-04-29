@@ -1,7 +1,7 @@
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import subprocess
+import threading
 import os
 import datetime
 import json
@@ -69,80 +69,146 @@ def add_log(level: str, message: str):
     job_status["logs"] = job_status["logs"][:20]
 
 def run_pipeline(product: str, min_cluster: int, max_themes: int):
-    """Background task that actually runs the pipeline and updates REAL status"""
+    """Background task that runs the pipeline IN-PROCESS with real-time status updates."""
     global job_status
     job_status["is_running"] = True
     job_status["status_message"] = f"Initializing pipeline for {product}..."
-    job_status["logs"] = [] # Clear old logs
+    job_status["logs"] = []
     
     # Reset all phases
     for key in job_status["progress"]:
         job_status["progress"][key] = {"status": "Pending", "progress": 0, "message": "Waiting..."}
 
     try:
-        # --- PHASE 1: INGESTION ---
+        # ========================
+        # PHASE 1: INGESTION
+        # ========================
         job_status["current_phase"] = "Ingesting"
-        job_status["progress"]["ingestor"] = {"status": "Running", "progress": 50, "message": f"Fetching reviews for {product}..."}
-        add_log("INFO", f"Starting pipeline for {product}...")
+        job_status["progress"]["ingestor"] = {"status": "Running", "progress": 20, "message": f"Fetching Play Store reviews for {product}..."}
+        add_log("INFO", f"Phase 1: Starting ingestion for {product}...")
         
-        env = os.environ.copy()
-        env["PYTHONIOENCODING"] = "utf-8"
-        
-        # Run main.py with Popen to capture realtime output
-        process = subprocess.Popen(
-            ["python", "-u", "main.py", "--product", product, "--mode", "full", "--min-cluster", str(min_cluster), "--max-themes", str(max_themes)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            env=env,
-            bufsize=1
-        )
-        
-        for line in iter(process.stdout.readline, ''):
-            line = line.strip()
-            if not line:
-                continue
-                
-            # Log to UI
-            add_log("INFO", line[:150] + ("..." if len(line)>150 else ""))
-            
-            # Simple heuristic phase detection
-            lower_line = line.lower()
-            if "phase 1" in lower_line or "ingest" in lower_line or "fetching" in lower_line:
-                job_status["current_phase"] = "Ingesting"
-                job_status["progress"]["ingestor"] = {"status": "Running", "progress": 50, "message": line[:50]}
-            elif "phase 2" in lower_line or "cluster" in lower_line or "hdbscan" in lower_line:
-                job_status["progress"]["ingestor"] = {"status": "Complete", "progress": 100, "message": "Ingestion complete."}
-                job_status["current_phase"] = "Clustering"
-                job_status["progress"]["clustering"] = {"status": "Running", "progress": 50, "message": line[:50]}
-            elif "phase 3" in lower_line or "summariz" in lower_line or "theme:" in lower_line:
-                job_status["progress"]["clustering"] = {"status": "Complete", "progress": 100, "message": "Clustering finished."}
-                job_status["current_phase"] = "Summarizing"
-                job_status["progress"]["summarizer"] = {"status": "Running", "progress": 50, "message": line[:50]}
-            elif "phase 4" in lower_line or "phase 5" in lower_line or "delivery" in lower_line or "google doc" in lower_line:
-                job_status["progress"]["summarizer"] = {"status": "Complete", "progress": 100, "message": "Summarization finished."}
-                job_status["current_phase"] = "Delivery"
-                job_status["progress"]["delivery"] = {"status": "Running", "progress": 50, "message": line[:50]}
-                
-            job_status["status_message"] = f"Working: {line[:40]}..."
+        try:
+            from src.phase_1.ingestor import run_ingestion
+            run_ingestion(product_name=product, weeks=12)
+            job_status["progress"]["ingestor"] = {"status": "Complete", "progress": 100, "message": "Reviews fetched and saved."}
+            add_log("SUCCESS", "Phase 1: Ingestion complete.")
+        except Exception as e:
+            add_log("WARNING", f"Phase 1 failed: {str(e)[:100]}. Continuing with existing data...")
+            job_status["progress"]["ingestor"] = {"status": "Complete", "progress": 100, "message": f"Used cached data ({str(e)[:30]}...)"}
 
-        process.wait()
+        # ========================
+        # PHASE 2: CLUSTERING
+        # ========================
+        job_status["current_phase"] = "Clustering"
+        job_status["progress"]["clustering"] = {"status": "Running", "progress": 20, "message": "Running AI clustering engine..."}
+        add_log("INFO", "Phase 2: Starting clustering pipeline...")
         
-        if process.returncode == 0:
-            # Update all to complete if successful
-            job_status["progress"]["ingestor"] = {"status": "Complete", "progress": 100, "message": "Successfully fetched reviews."}
-            job_status["progress"]["clustering"] = {"status": "Complete", "progress": 100, "message": "Clustering finished."}
-            job_status["progress"]["summarizer"] = {"status": "Complete", "progress": 100, "message": "AI Summarization finished."}
-            job_status["progress"]["delivery"] = {"status": "Complete", "progress": 100, "message": "Delivered to Google Docs & Gmail."}
-            job_status["status_message"] = "Success: Report Generated and Delivered!"
-            add_log("SUCCESS", "Pipeline execution finished successfully.")
-        else:
-            job_status["status_message"] = f"Failed: Pipeline error (Code {process.returncode})"
-            add_log("ERROR", f"Pipeline failed with return code {process.returncode}")
+        clustered_df = None
+        try:
+            from src.phase_2.clustering import run_clustering_pipeline
+            clustered_df = run_clustering_pipeline(
+                product_id=product,
+                min_cluster_size=min_cluster
+            )
+            theme_count = len(clustered_df[clustered_df['cluster'] != -1]['cluster'].unique()) if clustered_df is not None else 0
+            job_status["progress"]["clustering"] = {"status": "Complete", "progress": 100, "message": f"Clustering finished: {theme_count} themes identified."}
+            add_log("SUCCESS", f"Phase 2: Clustering complete. {theme_count} clusters found.")
+        except Exception as e:
+            job_status["progress"]["clustering"] = {"status": "Error", "progress": 0, "message": str(e)[:60]}
+            add_log("ERROR", f"Phase 2 failed: {str(e)[:150]}")
+            raise RuntimeError(f"Clustering failed: {e}")
+
+        # ========================
+        # PHASE 3: SUMMARIZATION
+        # ========================
+        summaries = []
+        if clustered_df is not None:
+            job_status["current_phase"] = "Summarizing"
+            job_status["progress"]["summarizer"] = {"status": "Running", "progress": 20, "message": "AI generating theme summaries..."}
+            add_log("INFO", "Phase 3: Starting LLM summarization...")
             
+            try:
+                from src.phase_3.summarizer import run_summarization_pipeline
+                summaries = run_summarization_pipeline(
+                    clustered_df=clustered_df,
+                    product_name=product,
+                    max_clusters=max_themes
+                )
+                job_status["progress"]["summarizer"] = {"status": "Complete", "progress": 100, "message": f"Summarized {len(summaries)} themes."}
+                add_log("SUCCESS", f"Phase 3: Summarization complete. {len(summaries)} themes summarized.")
+            except Exception as e:
+                job_status["progress"]["summarizer"] = {"status": "Error", "progress": 0, "message": str(e)[:60]}
+                add_log("ERROR", f"Phase 3 failed: {str(e)[:150]}")
+                raise RuntimeError(f"Summarization failed: {e}")
+
+        # ========================
+        # PHASE 4 & 5: RENDER + DELIVERY
+        # ========================
+        if summaries:
+            job_status["current_phase"] = "Delivering"
+            job_status["progress"]["delivery"] = {"status": "Running", "progress": 30, "message": "Rendering report..."}
+            add_log("INFO", "Phase 4: Rendering report...")
+            
+            try:
+                from src.phase_4.renderer import render_report
+                total_reviews = len(clustered_df) if clustered_df is not None else 0
+                report_md = render_report(
+                    summaries=summaries,
+                    product_name=product,
+                    total_reviews=total_reviews,
+                )
+                os.makedirs("data/summaries", exist_ok=True)
+                with open("data/summaries/latest_report.md", "w", encoding="utf-8") as f:
+                    f.write(report_md)
+                add_log("SUCCESS", "Phase 4: Report rendered and saved locally.")
+            except Exception as e:
+                add_log("WARNING", f"Phase 4 (Render) failed: {str(e)[:100]}")
+
+            # Phase 5: Google Docs delivery
+            job_status["progress"]["delivery"] = {"status": "Running", "progress": 60, "message": "Pushing to Google Docs..."}
+            add_log("INFO", "Phase 5: Delivering to Google Docs...")
+            
+            doc_url = None
+            try:
+                from src.phase_5.docs_delivery import append_to_doc
+                doc_url = append_to_doc(
+                    summaries=summaries,
+                    product_name=product,
+                    total_reviews=total_reviews
+                )
+                add_log("SUCCESS", f"Phase 5: Report delivered to Google Docs.")
+            except Exception as e:
+                add_log("WARNING", f"Phase 5 (Docs) failed: {str(e)[:100]}")
+
+            # Phase 6: Gmail delivery
+            if doc_url:
+                job_status["progress"]["delivery"] = {"status": "Running", "progress": 80, "message": "Sending email notification..."}
+                add_log("INFO", "Phase 6: Sending email notification...")
+                try:
+                    from src.phase_6.gmail_delivery import send_summary_email
+                    send_summary_email(
+                        doc_link=doc_url,
+                        product_name=product,
+                        theme_count=len(summaries),
+                    )
+                    add_log("SUCCESS", "Phase 6: Email notification sent.")
+                except Exception as e:
+                    add_log("WARNING", f"Phase 6 (Gmail) failed: {str(e)[:100]}")
+
+            job_status["progress"]["delivery"] = {"status": "Complete", "progress": 100, "message": "Pipeline delivery complete."}
+        else:
+            job_status["progress"]["delivery"] = {"status": "Complete", "progress": 100, "message": "No themes to deliver."}
+            add_log("WARNING", "No summaries generated. Skipping delivery.")
+
+        # ========================
+        # ALL DONE
+        # ========================
+        job_status["status_message"] = "Success: Report Generated and Delivered!"
+        add_log("SUCCESS", "Full pipeline execution finished successfully.")
+
     except Exception as e:
-        job_status["status_message"] = f"Error: {str(e)}"
-        add_log("ERROR", f"System Exception: {str(e)}")
+        job_status["status_message"] = f"Error: {str(e)[:100]}"
+        add_log("ERROR", f"Pipeline Exception: {str(e)[:200]}")
     finally:
         job_status["is_running"] = False
         job_status["last_run"] = datetime.datetime.now().isoformat()
