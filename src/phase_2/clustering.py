@@ -64,12 +64,11 @@ class EmbeddingClient:
         else:
             self.use_openai = False
             self.use_gemini = False
-            # Use a lightweight model for low-memory Render environment
-            self.model_name = model_name or "all-MiniLM-L6-v2"
-            print(f"Initializing local model: {self.model_name} (Warning: HIGH RAM USAGE)")
-            # Lazy import to save ~300MB RAM if using external APIs
-            from sentence_transformers import SentenceTransformer
-            self.model = SentenceTransformer(self.model_name)
+            # We completely disable local embeddings (SentenceTransformers) on Render
+            # because importing torch/transformers uses ~400MB RAM, causing instant OOM.
+            error_msg = "No API keys found! You MUST set GEMINI_API_KEY or OPENAI_API_KEY in Render Environment Variables. Local embeddings are disabled to prevent OOM crashes."
+            print(f"CRITICAL ERROR: {error_msg}")
+            raise RuntimeError(error_msg)
 
     def _get_cache_path(self, text: str) -> str:
         text_hash = hashlib.sha1(text.encode()).hexdigest()
@@ -118,7 +117,7 @@ class EmbeddingClient:
         return np.array(embeddings)
 
     def _embed_local(self, texts: List[str]) -> np.ndarray:
-        return self.model.encode(texts, batch_size=16, show_progress_bar=True)
+        raise RuntimeError("Local embeddings are disabled.")
 
     def _embed_openai(self, texts: List[str]) -> List[List[float]]:
         response = self.client.embeddings.create(
