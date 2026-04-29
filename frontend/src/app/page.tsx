@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { getApiUrl } from '@/lib/api';
 
 export default function Dashboard() {
   const [health, setHealth] = useState<any>(null);
@@ -14,10 +15,10 @@ export default function Dashboard() {
     const fetchData = async () => {
       try {
         const [healthRes, themesRes, feedRes, statusRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dashboard/health`),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dashboard/themes`),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dashboard/feed`),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/status` )
+          fetch(getApiUrl('/api/dashboard/health')),
+          fetch(getApiUrl('/api/dashboard/themes')),
+          fetch(getApiUrl('/api/dashboard/feed')),
+          fetch(getApiUrl('/api/status'))
         ]);
         
         if (healthRes.ok) setHealth(await healthRes.json());
@@ -34,7 +35,7 @@ export default function Dashboard() {
     fetchData();
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/status`);
+        const res = await fetch(getApiUrl('/api/status'));
         if (res.ok) setPipelineStatus(await res.json());
       } catch {}
     }, 3000);
@@ -45,13 +46,13 @@ export default function Dashboard() {
     if (pipelineStatus?.is_running) return;
     setIsGenerating(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/generate-report`, {
+      const res = await fetch(getApiUrl('/api/generate-report'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ product: 'Groww', min_cluster: 20, max_themes: 7 })
       });
       if (res.ok) {
-        const statusRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/status`);
+        const statusRes = await fetch(getApiUrl('/api/status'));
         if (statusRes.ok) setPipelineStatus(await statusRes.json());
       }
     } catch (error) {

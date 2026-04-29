@@ -1,6 +1,7 @@
-# Environment
+# Environment (secrets)
 .env
-*.env
+.env.local
+# Note: .env.production is committed intentionally (contains only public API URL)
 
 # Google OAuth credentials (NEVER commit these)
 credentials.json

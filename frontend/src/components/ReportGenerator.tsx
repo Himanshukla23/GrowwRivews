@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Loader2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getApiUrl } from '@/lib/api';
 
 export function ReportGenerator() {
   const [status, setStatus] = useState<any>(null);
@@ -10,7 +11,7 @@ export function ReportGenerator() {
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/status`);
+      const res = await fetch(getApiUrl('/api/status'));
       if (res.ok) {
         const data = await res.json();
         setStatus(data);
@@ -30,7 +31,7 @@ export function ReportGenerator() {
     if (status?.is_running) return;
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/generate-report`, {
+      const res = await fetch(getApiUrl('/api/generate-report'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ product: 'Groww', min_cluster: 20, max_themes: 7 })

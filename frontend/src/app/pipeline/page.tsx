@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { getApiUrl } from '@/lib/api';
 
 export default function Pipeline() {
   const [health, setHealth] = useState<any>(null);
@@ -11,8 +12,8 @@ export default function Pipeline() {
     const fetchData = async () => {
       try {
         const [healthRes, logsRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/pipeline/health`),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/pipeline/logs` )
+          fetch(getApiUrl('/api/pipeline/health')),
+          fetch(getApiUrl('/api/pipeline/logs'))
         ]);
         
         if (healthRes.ok) setHealth(await healthRes.json());
@@ -33,8 +34,8 @@ export default function Pipeline() {
     setLoading(true);
     try {
       const [healthRes, logsRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/pipeline/health`),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/pipeline/logs` )
+        fetch(getApiUrl('/api/pipeline/health')),
+        fetch(getApiUrl('/api/pipeline/logs'))
       ]);
       if (healthRes.ok) setHealth(await healthRes.json());
       if (logsRes.ok) setLogs(await logsRes.json());
@@ -45,7 +46,7 @@ export default function Pipeline() {
 
   const handleStopPipeline = async () => {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/stop-pipeline`, { method: 'POST' });
+      await fetch(getApiUrl('/api/stop-pipeline'), { method: 'POST' });
       handleRefresh();
     } catch (error) {
       console.error("Failed to stop pipeline:", error);

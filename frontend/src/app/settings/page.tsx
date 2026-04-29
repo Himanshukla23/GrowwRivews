@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { getApiUrl } from '@/lib/api';
 
 export default function Settings() {
   const [settings, setSettings] = useState<any>(null);
@@ -9,7 +10,7 @@ export default function Settings() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/settings`);
+        const res = await fetch(getApiUrl('/api/settings'));
         if (res.ok) {
           setSettings(await res.json());
         }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { getApiUrl } from '@/lib/api';
 
 export default function History() {
   const [report, setReport] = useState<any>(null);
@@ -9,7 +10,7 @@ export default function History() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/reports/weekly`);
+        const res = await fetch(getApiUrl('/api/reports/weekly'));
         if (res.ok) {
           setReport(await res.json());
         }
