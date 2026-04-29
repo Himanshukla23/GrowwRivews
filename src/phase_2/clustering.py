@@ -213,7 +213,7 @@ def run_clustering_pipeline(
     conn = get_db_connection()
     try:
         df = pd.read_sql_query(
-            "SELECT review_id, content FROM processed_reviews WHERE product_id = ? ORDER BY fetch_date DESC LIMIT 300",
+            "SELECT review_id, content FROM processed_reviews WHERE product_id = ? ORDER BY review_date DESC LIMIT 300",
             conn,
             params=(product_id,)
         )
