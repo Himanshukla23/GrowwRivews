@@ -6,7 +6,6 @@ import hashlib
 import pickle
 import umap
 from sklearn.cluster import DBSCAN
-from sentence_transformers import SentenceTransformer
 from typing import List, Optional, Dict
 import traceback
 from langdetect import detect, DetectorFactory
@@ -43,24 +42,33 @@ class EmbeddingClient:
     Handles embedding generation with support for OpenAI and Local models.
     Includes granular on-disk caching.
     """
-    def __init__(self, use_openai: bool = False, model_name: Optional[str] = None):
         self.use_openai = use_openai
+        self.use_gemini = False
         self.cache_dir = "data/embeddings_cache"
         os.makedirs(self.cache_dir, exist_ok=True)
         
-        if self.use_openai:
+        # Check API keys
+        openai_key = os.getenv("OPENAI_API_KEY")
+        gemini_key = os.getenv("GEMINI_API_KEY")
+
+        if self.use_openai and openai_key:
             self.model_name = model_name or "text-embedding-3-small"
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                print("Warning: OPENAI_API_KEY not found. Falling back to local embeddings.")
-                self.use_openai = False
-            else:
-                self.client = openai.OpenAI(api_key=api_key)
-        
-        if not self.use_openai:
+            self.client = openai.OpenAI(api_key=openai_key)
+        elif gemini_key:
+            import google.generativeai as genai
+            genai.configure(api_key=gemini_key)
+            self.use_gemini = True
+            self.use_openai = False
+            self.model_name = "models/text-embedding-004"
+            print("Using Gemini API for embeddings (zero local memory footprint)")
+        else:
+            self.use_openai = False
+            self.use_gemini = False
             # Use a lightweight model for low-memory Render environment
             self.model_name = model_name or "all-MiniLM-L6-v2"
-            print(f"Initializing local model: {self.model_name}")
+            print(f"Initializing local model: {self.model_name} (Warning: HIGH RAM USAGE)")
+            # Lazy import to save ~300MB RAM if using external APIs
+            from sentence_transformers import SentenceTransformer
             self.model = SentenceTransformer(self.model_name)
 
     def _get_cache_path(self, text: str) -> str:
@@ -96,6 +104,8 @@ class EmbeddingClient:
             print(f"Embedding {len(texts_to_embed)} new texts...")
             if self.use_openai:
                 new_embeddings = self._embed_openai(texts_to_embed)
+            elif self.use_gemini:
+                new_embeddings = self._embed_gemini(texts_to_embed)
             else:
                 new_embeddings = self._embed_local(texts_to_embed)
             
@@ -116,6 +126,24 @@ class EmbeddingClient:
             model=self.model_name
         )
         return [data.embedding for data in response.data]
+
+    def _embed_gemini(self, texts: List[str]) -> List[List[float]]:
+        import google.generativeai as genai
+        # Gemini handles batches natively but has limits. Batch size 100 max per request.
+        all_embeddings = []
+        batch_size = 50
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i+batch_size]
+            result = genai.embed_content(
+                model=self.model_name,
+                content=batch,
+                task_type="clustering"
+            )
+            if isinstance(result['embedding'][0], list):
+                all_embeddings.extend(result['embedding'])
+            else:
+                all_embeddings.append(result['embedding'])
+        return all_embeddings
 
 def get_db_connection(db_path="data/audit_log.db"):
     # Ensure directory exists before connecting
