@@ -50,6 +50,11 @@ def get_google_credentials() -> Credentials:
                     "OAuth 2.0 Client IDs → Download JSON, and save as 'credentials.json' "
                     "in the project root."
                 )
+                
+            # Fail fast if we are running in a headless cloud environment
+            if "RENDER" in os.environ or "FLY_APP_NAME" in os.environ or "VERCEL" in os.environ or not os.environ.get("DISPLAY", "true"):
+                raise RuntimeError("Cannot perform interactive Google OAuth flow on cloud deployment! Ensure GOOGLE_TOKEN_BASE64 is set with a valid token.")
+                
             print("[Auth] Starting Google OAuth flow (browser will open)...")
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
             creds = flow.run_local_server(port=0)

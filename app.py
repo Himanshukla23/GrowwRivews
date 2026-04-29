@@ -83,33 +83,62 @@ def run_pipeline(product: str, min_cluster: int, max_themes: int):
         # --- PHASE 1: INGESTION ---
         job_status["current_phase"] = "Ingesting"
         job_status["progress"]["ingestor"] = {"status": "Running", "progress": 50, "message": f"Fetching reviews for {product}..."}
-        add_log("INFO", f"Starting ingestion for {product} (12 week window)...")
+        add_log("INFO", f"Starting pipeline for {product}...")
         
-        # We run the actual logic here (simplified for the background process update)
-        # In a real heavy app, we'd pipe the stdout of the subprocess to update these percentages
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
         
-        # Run main.py
-        process = subprocess.run(
+        # Run main.py with Popen to capture realtime output
+        process = subprocess.Popen(
             ["python", "-u", "main.py", "--product", product, "--mode", "full", "--min-cluster", str(min_cluster), "--max-themes", str(max_themes)],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            env=env
+            env=env,
+            bufsize=1
         )
+        
+        for line in iter(process.stdout.readline, ''):
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Log to UI
+            add_log("INFO", line[:150] + ("..." if len(line)>150 else ""))
+            
+            # Simple heuristic phase detection
+            lower_line = line.lower()
+            if "phase 1" in lower_line or "ingest" in lower_line or "fetching" in lower_line:
+                job_status["current_phase"] = "Ingesting"
+                job_status["progress"]["ingestor"] = {"status": "Running", "progress": 50, "message": line[:50]}
+            elif "phase 2" in lower_line or "cluster" in lower_line or "hdbscan" in lower_line:
+                job_status["progress"]["ingestor"] = {"status": "Complete", "progress": 100, "message": "Ingestion complete."}
+                job_status["current_phase"] = "Clustering"
+                job_status["progress"]["clustering"] = {"status": "Running", "progress": 50, "message": line[:50]}
+            elif "phase 3" in lower_line or "summariz" in lower_line or "theme:" in lower_line:
+                job_status["progress"]["clustering"] = {"status": "Complete", "progress": 100, "message": "Clustering finished."}
+                job_status["current_phase"] = "Summarizing"
+                job_status["progress"]["summarizer"] = {"status": "Running", "progress": 50, "message": line[:50]}
+            elif "phase 4" in lower_line or "phase 5" in lower_line or "delivery" in lower_line or "google doc" in lower_line:
+                job_status["progress"]["summarizer"] = {"status": "Complete", "progress": 100, "message": "Summarization finished."}
+                job_status["current_phase"] = "Delivery"
+                job_status["progress"]["delivery"] = {"status": "Running", "progress": 50, "message": line[:50]}
+                
+            job_status["status_message"] = f"Working: {line[:40]}..."
+
+        process.wait()
         
         if process.returncode == 0:
             # Update all to complete if successful
-            job_status["progress"]["ingestor"] = {"status": "Complete", "progress": 100, "message": "Successfully fetched 1,247 reviews."}
-            job_status["progress"]["clustering"] = {"status": "Complete", "progress": 100, "message": "Clustering finished: 9 themes identified."}
+            job_status["progress"]["ingestor"] = {"status": "Complete", "progress": 100, "message": "Successfully fetched reviews."}
+            job_status["progress"]["clustering"] = {"status": "Complete", "progress": 100, "message": "Clustering finished."}
             job_status["progress"]["summarizer"] = {"status": "Complete", "progress": 100, "message": "AI Summarization finished."}
             job_status["progress"]["delivery"] = {"status": "Complete", "progress": 100, "message": "Delivered to Google Docs & Gmail."}
             job_status["status_message"] = "Success: Report Generated and Delivered!"
             add_log("SUCCESS", "Pipeline execution finished successfully.")
         else:
-            job_status["status_message"] = f"Failed: Pipeline error"
-            error_snippet = process.stderr[-200:] if process.stderr else "Unknown error"
-            add_log("ERROR", f"Pipeline failed: {error_snippet}")
+            job_status["status_message"] = f"Failed: Pipeline error (Code {process.returncode})"
+            add_log("ERROR", f"Pipeline failed with return code {process.returncode}")
             
     except Exception as e:
         job_status["status_message"] = f"Error: {str(e)}"
