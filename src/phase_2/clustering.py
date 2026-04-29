@@ -67,9 +67,7 @@ class EmbeddingClient:
             self.use_gemini = False
             # We completely disable local embeddings (SentenceTransformers) on Render
             # because importing torch/transformers uses ~400MB RAM, causing instant OOM.
-            error_msg = "No API keys found! You MUST set GEMINI_API_KEY or OPENAI_API_KEY in Render Environment Variables. Local embeddings are disabled to prevent OOM crashes."
-            print(f"CRITICAL ERROR: {error_msg}")
-            raise RuntimeError(error_msg)
+            print("No external API keys found. Defaulting to TF-IDF embeddings to prevent OOM crashes.")
 
     def _get_cache_path(self, text: str) -> str:
         text_hash = hashlib.sha1(text.encode()).hexdigest()
@@ -107,7 +105,7 @@ class EmbeddingClient:
             elif self.use_gemini:
                 new_embeddings = self._embed_gemini(texts_to_embed)
             else:
-                new_embeddings = self._embed_local(texts_to_embed)
+                new_embeddings = self._embed_tfidf(texts_to_embed)
             
             for i, (idx, emb) in enumerate(zip(indices_to_embed, new_embeddings)):
                 cache_path = self._get_cache_path(texts_to_embed[i])
@@ -118,7 +116,7 @@ class EmbeddingClient:
         return np.array(embeddings)
 
     def _embed_local(self, texts: List[str]) -> np.ndarray:
-        raise RuntimeError("Local embeddings are disabled.")
+        return np.array(self._embed_tfidf(texts))
 
     def _embed_openai(self, texts: List[str]) -> List[List[float]]:
         response = self.client.embeddings.create(
@@ -152,15 +150,23 @@ class EmbeddingClient:
                     # Respect free tier rate limits (~15 RPM)
                     time.sleep(4)
                 except Exception as e:
-                    if "429" in str(e):
+                    if "429" in str(e) or "quota" in str(e).lower():
                         retries -= 1
-                        print(f"Rate limit hit. Waiting 10 seconds before retry... ({retries} retries left)")
+                        print(f"Quota/Rate limit hit. Waiting 10 seconds before retry... ({retries} retries left)")
                         time.sleep(10)
                     else:
                         raise e
             if not success:
-                raise RuntimeError("Failed to embed batch after multiple retries due to rate limits.")
+                print("Gemini API quota exhausted! Falling back to lightweight TF-IDF embeddings.")
+                return self._embed_tfidf(texts)
         return all_embeddings
+
+    def _embed_tfidf(self, texts: List[str]) -> List[List[float]]:
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        print("Running TF-IDF Vectorizer as a fallback (Zero RAM, Zero API cost)...")
+        # Use 384 dimensions to match sentence-transformers output shape roughly
+        vectorizer = TfidfVectorizer(max_features=384, stop_words='english')
+        return vectorizer.fit_transform(texts).toarray().tolist()
 
 def get_db_connection(db_path="data/audit_log.db"):
     # Ensure directory exists before connecting
