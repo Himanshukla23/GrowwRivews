@@ -7,7 +7,7 @@ from langdetect import detect, DetectorFactory
 # Ensure consistent language detection
 DetectorFactory.seed = 0
 
-def fetch_playstore_reviews(app_id: str, weeks: int = 12) -> List[RawReview]:
+def fetch_playstore_reviews(app_id: str, weeks: int = 12, max_reviews: int = 200) -> List[RawReview]:
     """
     Fetches reviews from Google Play Store for the given app_id.
     Filters by:
@@ -70,8 +70,10 @@ def fetch_playstore_reviews(app_id: str, weeks: int = 12) -> List[RawReview]:
                 version=r.get('reviewCreatedVersion')
             ))
             
-        if not continuation_token:
+        if not continuation_token or len(all_raw_reviews) >= max_reviews:
             break
             
+    # Cap strictly to max_reviews
+    all_raw_reviews = all_raw_reviews[:max_reviews]
     print(f"Fetched {len(all_raw_reviews)} valid Play Store reviews.")
     return all_raw_reviews

@@ -58,8 +58,8 @@ class EmbeddingClient:
                 self.client = openai.OpenAI(api_key=api_key)
         
         if not self.use_openai:
-            # Strictly using the model requested in the plan
-            self.model_name = model_name or "BAAI/bge-small-en-v1.5"
+            # Use a lightweight model for low-memory Render environment
+            self.model_name = model_name or "all-MiniLM-L6-v2"
             print(f"Initializing local model: {self.model_name}")
             self.model = SentenceTransformer(self.model_name)
 
@@ -108,7 +108,7 @@ class EmbeddingClient:
         return np.array(embeddings)
 
     def _embed_local(self, texts: List[str]) -> np.ndarray:
-        return self.model.encode(texts, batch_size=32, show_progress_bar=True)
+        return self.model.encode(texts, batch_size=16, show_progress_bar=True)
 
     def _embed_openai(self, texts: List[str]) -> List[List[float]]:
         response = self.client.embeddings.create(

@@ -59,9 +59,9 @@ def run_ingestion(product_name="Groww", play_id="com.nextbillion.groww", apple_i
     """Orchestrates the full ingestion process."""
     print(f"--- Ingestion Start: {product_name} ---")
     
-    # 1. Fetch
-    ps_reviews = fetch_playstore_reviews(play_id, weeks=weeks)
-    as_reviews = fetch_appstore_reviews(product_name.lower(), apple_id, weeks=weeks)
+    # 1. Fetch with a strict limit to prevent OOM on Render
+    ps_reviews = fetch_playstore_reviews(play_id, weeks=weeks, max_reviews=200)
+    as_reviews = fetch_appstore_reviews(product_name.lower(), apple_id, weeks=weeks, max_reviews=100)
     
     all_reviews = ps_reviews + as_reviews
     

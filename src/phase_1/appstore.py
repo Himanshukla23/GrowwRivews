@@ -6,7 +6,7 @@ from langdetect import detect, DetectorFactory
 
 DetectorFactory.seed = 0
 
-def fetch_appstore_reviews(app_name: str, app_id: str, weeks: int = 12) -> List[RawReview]:
+def fetch_appstore_reviews(app_name: str, app_id: str, weeks: int = 12, max_reviews: int = 200) -> List[RawReview]:
     """
     Fetches reviews from Apple App Store.
     Note: AppStore scraper works slightly differently (paginated).
@@ -19,8 +19,8 @@ def fetch_appstore_reviews(app_name: str, app_id: str, weeks: int = 12) -> List[
     print(f"Fetching App Store reviews for {app_name}...")
     
     # app.review() fetches reviews and stores them in app.reviews
-    # We limit to 10 batches of 20 to avoid excessive calls in this phase
-    app.review(how_many=200)
+    # We limit to max_reviews to avoid excessive memory usage
+    app.review(how_many=max_reviews)
     
     for r in app.reviews:
         review_date = r['date']
@@ -51,5 +51,8 @@ def fetch_appstore_reviews(app_name: str, app_id: str, weeks: int = 12) -> List[
             version=r.get('version')
         ))
         
+        if len(all_raw_reviews) >= max_reviews:
+            break
+            
     print(f"Fetched {len(all_raw_reviews)} valid App Store reviews.")
     return all_raw_reviews
