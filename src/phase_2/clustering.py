@@ -42,6 +42,7 @@ class EmbeddingClient:
     Handles embedding generation with support for OpenAI and Local models.
     Includes granular on-disk caching.
     """
+    def __init__(self, use_openai: bool = False, model_name: Optional[str] = None):
         self.use_openai = use_openai
         self.use_gemini = False
         self.cache_dir = "data/embeddings_cache"
