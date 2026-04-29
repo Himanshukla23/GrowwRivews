@@ -129,20 +129,37 @@ class EmbeddingClient:
 
     def _embed_gemini(self, texts: List[str]) -> List[List[float]]:
         import google.generativeai as genai
+        import time
         # Gemini handles batches natively but has limits. Batch size 100 max per request.
         all_embeddings = []
         batch_size = 50
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i+batch_size]
-            result = genai.embed_content(
-                model=self.model_name,
-                content=batch,
-                task_type="clustering"
-            )
-            if isinstance(result['embedding'][0], list):
-                all_embeddings.extend(result['embedding'])
-            else:
-                all_embeddings.append(result['embedding'])
+            success = False
+            retries = 3
+            while not success and retries > 0:
+                try:
+                    result = genai.embed_content(
+                        model=self.model_name,
+                        content=batch,
+                        task_type="clustering"
+                    )
+                    if isinstance(result['embedding'][0], list):
+                        all_embeddings.extend(result['embedding'])
+                    else:
+                        all_embeddings.append(result['embedding'])
+                    success = True
+                    # Respect free tier rate limits (~15 RPM)
+                    time.sleep(4)
+                except Exception as e:
+                    if "429" in str(e):
+                        retries -= 1
+                        print(f"Rate limit hit. Waiting 10 seconds before retry... ({retries} retries left)")
+                        time.sleep(10)
+                    else:
+                        raise e
+            if not success:
+                raise RuntimeError("Failed to embed batch after multiple retries due to rate limits.")
         return all_embeddings
 
 def get_db_connection(db_path="data/audit_log.db"):
