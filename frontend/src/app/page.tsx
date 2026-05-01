@@ -49,7 +49,7 @@ export default function Dashboard() {
       const res = await fetch(getApiUrl('/api/generate-report'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product: 'Groww', min_cluster: 20, max_themes: 7 })
+        body: JSON.stringify({ product: 'Groww', min_cluster: 10, max_themes: 7 })
       });
       if (res.ok) {
         const statusRes = await fetch(getApiUrl('/api/status'));
