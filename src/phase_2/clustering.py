@@ -317,7 +317,7 @@ def run_clustering_pipeline(
         )
     else:
         # Fallback to DBSCAN if hdbscan is missing
-        clusterer = DBSCAN(eps=0.4, min_samples=3)
+        clusterer = DBSCAN(eps=0.55, min_samples=3)
 
     clusters = clusterer.fit_predict(reduced_embeddings)
     df['cluster'] = clusters
