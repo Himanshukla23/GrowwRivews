@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { getApiUrl } from '@/lib/api';
+import { ReportGenerator } from '@/components/ReportGenerator';
 
 export default function Pipeline() {
   const [health, setHealth] = useState<any>(null);
@@ -85,6 +86,9 @@ export default function Pipeline() {
             </button>
           </div>
         </header>
+
+        {/* Generate Report with Custom Recipient Email */}
+        <ReportGenerator />
 
         {/* Bento Grid Layout */}
         <div className="grid grid-cols-12 gap-gutter">
