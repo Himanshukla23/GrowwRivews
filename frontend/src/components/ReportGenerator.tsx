@@ -8,6 +8,7 @@ import { getApiUrl } from '@/lib/api';
 export function ReportGenerator() {
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState<string>('');
 
   const fetchStatus = async () => {
     try {
@@ -31,10 +32,14 @@ export function ReportGenerator() {
     if (status?.is_running) return;
     setLoading(true);
     try {
+      const payload: any = { product: 'Groww', min_cluster: 10, max_themes: 7 };
+      if (email.trim()) {
+        payload.recipient_email = email.trim();
+      }
       const res = await fetch(getApiUrl('/api/generate-report'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product: 'Groww', min_cluster: 20, max_themes: 7 })
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         await fetchStatus();
@@ -56,23 +61,32 @@ export function ReportGenerator() {
           </p>
         </div>
         
-        <button
-          onClick={handleGenerate}
-          disabled={status?.is_running || loading}
-          className={cn(
-            "group relative px-8 py-4 bg-gray-900 text-white rounded-2xl font-semibold shadow-lg shadow-gray-900/20 transition-all flex items-center gap-3 overflow-hidden",
-            (status?.is_running || loading) ? "opacity-90 cursor-not-allowed" : "hover:shadow-xl hover:shadow-gray-900/30 hover:-translate-y-0.5 active:translate-y-0"
-          )}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-          
-          {status?.is_running ? (
-            <RefreshCw className="w-5 h-5 animate-spin" />
-          ) : (
-            <Play className="w-5 h-5 fill-white" />
-          )}
-          <span>{status?.is_running ? 'Generating...' : 'Generate Now'}</span>
-        </button>
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Recipient email (optional)"
+            className="px-4 py-3.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 w-full md:w-64"
+          />
+          <button
+            onClick={handleGenerate}
+            disabled={status?.is_running || loading}
+            className={cn(
+              "group relative px-8 py-4 bg-gray-900 text-white rounded-2xl font-semibold shadow-lg shadow-gray-900/20 transition-all flex items-center gap-3 overflow-hidden whitespace-nowrap justify-center",
+              (status?.is_running || loading) ? "opacity-90 cursor-not-allowed" : "hover:shadow-xl hover:shadow-gray-900/30 hover:-translate-y-0.5 active:translate-y-0"
+            )}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+            
+            {status?.is_running ? (
+              <RefreshCw className="w-5 h-5 animate-spin" />
+            ) : (
+              <Play className="w-5 h-5 fill-white" />
+            )}
+            <span>{status?.is_running ? 'Generating...' : 'Generate Now'}</span>
+          </button>
+        </div>
       </div>
 
       <div className="mt-8 pt-8 border-t border-gray-100 grid grid-cols-1 md:grid-cols-3 gap-6">

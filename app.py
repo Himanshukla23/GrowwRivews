@@ -69,6 +69,7 @@ class ReportRequest(BaseModel):
     product: str = "Groww"
     min_cluster: int = 10
     max_themes: int = 7
+    recipient_email: Optional[str] = None
 
 def add_log(level: str, message: str):
     global job_status
@@ -77,7 +78,7 @@ def add_log(level: str, message: str):
     # Keep only last 20 logs
     job_status["logs"] = job_status["logs"][:20]
 
-def run_pipeline(product: str, min_cluster: int, max_themes: int):
+def run_pipeline(product: str, min_cluster: int, max_themes: int, recipient_email: Optional[str] = None):
     """Background task that runs the pipeline IN-PROCESS with real-time status updates."""
     global job_status
     job_status["is_running"] = True
@@ -202,6 +203,7 @@ def run_pipeline(product: str, min_cluster: int, max_themes: int):
                     doc_link=doc_url,
                     product_name=product,
                     theme_count=len(summaries),
+                    recipient=recipient_email,
                 )
                 add_log("SUCCESS", "Phase 6: Email notification sent successfully.")
             except Exception as e:
@@ -237,7 +239,7 @@ def trigger_report(req: ReportRequest, background_tasks: BackgroundTasks):
     if job_status["is_running"]:
         raise HTTPException(status_code=400, detail="A report is already being generated right now.")
     
-    background_tasks.add_task(run_pipeline, req.product, req.min_cluster, req.max_themes)
+    background_tasks.add_task(run_pipeline, req.product, req.min_cluster, req.max_themes, req.recipient_email)
     return {"message": "Report generation started.", "status": "Running"}
 
 @app.get("/api/status")
