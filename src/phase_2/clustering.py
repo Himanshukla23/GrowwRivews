@@ -4,7 +4,6 @@ import numpy as np
 import os
 import hashlib
 import pickle
-import umap
 from sklearn.cluster import DBSCAN
 from typing import List, Optional, Dict
 import traceback
@@ -27,15 +26,13 @@ DetectorFactory.seed = 42
 load_dotenv()
 
 # Fallback for HDBSCAN if not available
-try:
-    import hdbscan  # type: ignore[import-not-found]
-    HAS_HDBSCAN = True
-except ImportError:
-    HAS_HDBSCAN = False
-    # Only print warning once
-    if os.environ.get("HIDE_HDBSCAN_WARNING") != "1":
-        print("Notice: hdbscan not found. Using optimized DBSCAN fallback.")
-        os.environ["HIDE_HDBSCAN_WARNING"] = "1"
+HAS_HDBSCAN = False
+if "RENDER" not in os.environ and "FLY_APP_NAME" not in os.environ and "VERCEL" not in os.environ:
+    try:
+        import hdbscan  # type: ignore[import-not-found]
+        HAS_HDBSCAN = True
+    except ImportError:
+        pass
 
 class EmbeddingClient:
     """
@@ -304,6 +301,7 @@ def run_clustering_pipeline(
         reducer = TruncatedSVD(n_components=5, random_state=42)
         reduced_embeddings = reducer.fit_transform(embeddings)
     else:
+        import umap
         print("Reducing dimensions (UMAP)...")
         reducer = umap.UMAP(
             n_neighbors=15,
