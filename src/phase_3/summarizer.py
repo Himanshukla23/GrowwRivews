@@ -359,23 +359,22 @@ def run_summarization_pipeline(
             summary.review_count = review_count
         return cluster_id, summary
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        future_to_cluster = {executor.submit(process_cluster, cid): cid for cid in cluster_ids}
-        for future in as_completed(future_to_cluster):
-            cid = future_to_cluster[future]
-            try:
-                _, summary = future.result()
-                if summary:
-                    summaries.append(summary)
-                    try:
-                        theme_disp = summary.theme_name.encode('ascii', 'ignore').decode('ascii')
-                        print(f"    -> Theme: \"{theme_disp}\"")
-                    except:
-                        print(f"    -> Theme identified for Cluster {cid}")
-                else:
-                    print(f"    -> Skipped Cluster {cid} (LLM error)")
-            except Exception as exc:
-                print(f"    -> Cluster {cid} generated an exception: {exc}")
+    for cid in cluster_ids:
+        try:
+            _, summary = process_cluster(cid)
+            if summary:
+                summaries.append(summary)
+                try:
+                    theme_disp = summary.theme_name.encode('ascii', 'ignore').decode('ascii')
+                    print(f"    -> Theme: \"{theme_disp}\"")
+                except:
+                    print(f"    -> Theme identified for Cluster {cid}")
+            else:
+                print(f"    -> Skipped Cluster {cid} (LLM error)")
+            # Add a small 1-second delay between requests to be extra safe against rate limits
+            time.sleep(1)
+        except Exception as exc:
+            print(f"    -> Cluster {cid} generated an exception: {exc}")
 
     print(f"\n--- Summarization complete: {len(summaries)}/{len(cluster_ids)} summarized ---")
     return summaries
