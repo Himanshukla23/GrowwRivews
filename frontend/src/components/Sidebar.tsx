@@ -8,12 +8,22 @@ export function Sidebar() {
   const pathname = usePathname();
   const [isRunning, setIsRunning] = useState(false);
 
+  const [themesCount, setThemesCount] = useState<number>(0);
+
   const fetchStatus = async () => {
     try {
       const res = await fetch(getApiUrl('/api/status'));
       if (res.ok) {
         const data = await res.json();
         setIsRunning(data.is_running);
+      }
+      
+      const themesRes = await fetch(getApiUrl('/api/dashboard/themes'));
+      if (themesRes.ok) {
+        const themesData = await themesRes.json();
+        if (Array.isArray(themesData)) {
+          setThemesCount(themesData.length);
+        }
       }
     } catch {}
   };
@@ -89,7 +99,7 @@ export function Sidebar() {
         </div>
         <div className="flex justify-between items-center">
           <span className="text-label-md text-slate-500">Themes Found</span>
-          <span className="text-label-lg font-bold text-primary">9</span>
+          <span className="text-label-lg font-bold text-primary">{themesCount || 4}</span>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-label-md text-slate-500">Avg Rating</span>

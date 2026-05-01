@@ -65,6 +65,8 @@ job_status = {
     "logs": []
 }
 
+global_latest_summaries = []
+
 class ReportRequest(BaseModel):
     product: str = "Groww"
     min_cluster: int = 10
@@ -172,6 +174,8 @@ def run_pipeline(product: str, min_cluster: int, max_themes: int, recipient_emai
                     f.write(report_md)
                 # Save summaries as JSON for the dashboard
                 summaries_json = [s.to_dict() for s in summaries]
+                global global_latest_summaries
+                global_latest_summaries = summaries_json
                 with open("data/summaries/latest_summaries.json", "w", encoding="utf-8") as f:
                     json.dump(summaries_json, f, indent=2)
                 add_log("SUCCESS", "Phase 4: Structured summaries saved for dashboard.")
@@ -300,12 +304,20 @@ def get_dashboard_health():
 
 @app.get("/api/dashboard/themes")
 def get_dashboard_themes():
-    # Load real data if available
-    if os.path.exists("data/summaries/latest_summaries.json"):
+    # Prioritize in-memory data for ephemeral environments
+    global global_latest_summaries
+    summaries = None
+    if global_latest_summaries:
+        summaries = global_latest_summaries
+    elif os.path.exists("data/summaries/latest_summaries.json"):
         try:
             with open("data/summaries/latest_summaries.json", "r") as f:
                 summaries = json.load(f)
-                
+        except Exception as e:
+            print(f"Error loading file: {e}")
+
+    if summaries:
+        try:
             # Map ThemeSummary to Dashboard Theme format
             mapped_themes = []
             icons = {
