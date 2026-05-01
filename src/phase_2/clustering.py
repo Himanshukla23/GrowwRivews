@@ -297,16 +297,22 @@ def run_clustering_pipeline(
     client = EmbeddingClient()
     embeddings = client.get_embeddings(df['content'].tolist())
 
-    # 4. Dimensionality Reduction (UMAP)
-    print("Reducing dimensions (UMAP)...")
-    reducer = umap.UMAP(
-        n_neighbors=15,
-        n_components=5,
-        min_dist=0.0,
-        metric='cosine',
-        random_state=42
-    )
-    reduced_embeddings = reducer.fit_transform(embeddings)
+    # 4. Dimensionality Reduction (UMAP / TruncatedSVD on Cloud)
+    if "RENDER" in os.environ or "FLY_APP_NAME" in os.environ or "VERCEL" in os.environ:
+        print("Detected cloud deployment. Using TruncatedSVD for fast dimensionality reduction to prevent timeouts/OOM.")
+        from sklearn.decomposition import TruncatedSVD
+        reducer = TruncatedSVD(n_components=5, random_state=42)
+        reduced_embeddings = reducer.fit_transform(embeddings)
+    else:
+        print("Reducing dimensions (UMAP)...")
+        reducer = umap.UMAP(
+            n_neighbors=15,
+            n_components=5,
+            min_dist=0.0,
+            metric='cosine',
+            random_state=42
+        )
+        reduced_embeddings = reducer.fit_transform(embeddings)
 
     # 5. Clustering (HDBSCAN or DBSCAN fallback)
     print(f"Clustering (min_cluster_size={min_cluster_size})...")

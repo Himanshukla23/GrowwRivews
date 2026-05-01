@@ -39,7 +39,12 @@ def startup_event():
 # Allow requests from Vercel frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://groww-rivews.vercel.app",
+        "https://groww-rivews-git-main-himanshukla23s-projects.vercel.app",
+    ],
+    allow_origin_regex="https://.*\\.vercel\\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
