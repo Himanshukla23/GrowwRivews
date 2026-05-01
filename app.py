@@ -67,8 +67,8 @@ job_status = {
 
 class ReportRequest(BaseModel):
     product: str = "Groww"
-    min_cluster: int = 20
-    max_themes: int = 5
+    min_cluster: int = 10
+    max_themes: int = 7
 
 def add_log(level: str, message: str):
     global job_status

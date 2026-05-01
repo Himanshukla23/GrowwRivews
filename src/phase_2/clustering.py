@@ -280,15 +280,9 @@ def run_clustering_pipeline(
     print(f"Initial reviews: {len(df)}")
 
     # 2. Pre-filtering
-    # Length filter: Ignore very short 'ok', 'good' reviews
-    df = df[df['content'].str.len() >= 20].reset_index(drop=True)
+    # Include all reviews with length >= 12
+    df = df[df['content'].str.len() >= 12].reset_index(drop=True)
     print(f"After length filter: {len(df)}")
-
-    # Language filter: Keep only English
-    print("Applying language filter...")
-    df['lang'] = df['content'].apply(lambda x: 'en' if is_english(x) else 'other')
-    df = df[df['lang'] == 'en'].drop(columns=['lang']).reset_index(drop=True)
-    print(f"After language filter: {len(df)}")
 
     # 3. Embedding
     client = EmbeddingClient()
@@ -316,14 +310,14 @@ def run_clustering_pipeline(
     print(f"Clustering (min_cluster_size={min_cluster_size})...")
     if HAS_HDBSCAN:
         clusterer = hdbscan.HDBSCAN(
-            min_cluster_size=min_cluster_size,
-            min_samples=5,
+            min_cluster_size=max(5, min_cluster_size),
+            min_samples=3,
             metric='euclidean',
             cluster_selection_method='eom'
         )
     else:
         # Fallback to DBSCAN if hdbscan is missing
-        clusterer = DBSCAN(eps=0.5, min_samples=min_cluster_size)
+        clusterer = DBSCAN(eps=1.2, min_samples=max(4, min_cluster_size // 2))
 
     clusters = clusterer.fit_predict(reduced_embeddings)
     df['cluster'] = clusters
