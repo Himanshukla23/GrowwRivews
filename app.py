@@ -7,6 +7,10 @@ import datetime
 import json
 import base64
 from typing import Optional, List, Dict
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = FastAPI(title="GrowwPulse API")
 
@@ -160,7 +164,11 @@ def run_pipeline(product: str, min_cluster: int, max_themes: int):
                 os.makedirs("data/summaries", exist_ok=True)
                 with open("data/summaries/latest_report.md", "w", encoding="utf-8") as f:
                     f.write(report_md)
-                add_log("SUCCESS", "Phase 4: Report rendered and saved locally.")
+                # Save summaries as JSON for the dashboard
+                summaries_json = [s.to_dict() for s in summaries]
+                with open("data/summaries/latest_summaries.json", "w", encoding="utf-8") as f:
+                    json.dump(summaries_json, f, indent=2)
+                add_log("SUCCESS", "Phase 4: Structured summaries saved for dashboard.")
             except Exception as e:
                 add_log("WARNING", f"Phase 4 (Render) failed: {str(e)[:100]}")
 
@@ -181,19 +189,18 @@ def run_pipeline(product: str, min_cluster: int, max_themes: int):
                 add_log("WARNING", f"Phase 5 (Docs) failed: {str(e)[:100]}")
 
             # Phase 6: Gmail delivery
-            if doc_url:
-                job_status["progress"]["delivery"] = {"status": "Running", "progress": 80, "message": "Sending email notification..."}
-                add_log("INFO", "Phase 6: Sending email notification...")
-                try:
-                    from src.phase_6.gmail_delivery import send_summary_email
-                    send_summary_email(
-                        doc_link=doc_url,
-                        product_name=product,
-                        theme_count=len(summaries),
-                    )
-                    add_log("SUCCESS", "Phase 6: Email notification sent.")
-                except Exception as e:
-                    add_log("WARNING", f"Phase 6 (Gmail) failed: {str(e)[:100]}")
+            job_status["progress"]["delivery"] = {"status": "Running", "progress": 80, "message": "Sending email notification..."}
+            add_log("INFO", "Phase 6: Sending email notification...")
+            try:
+                from src.phase_6.gmail_delivery import send_summary_email
+                send_summary_email(
+                    doc_link=doc_url,
+                    product_name=product,
+                    theme_count=len(summaries),
+                )
+                add_log("SUCCESS", "Phase 6: Email notification sent successfully.")
+            except Exception as e:
+                add_log("ERROR", f"Phase 6 (Gmail) failed: {str(e)[:100]}")
 
             job_status["progress"]["delivery"] = {"status": "Complete", "progress": 100, "message": "Pipeline delivery complete."}
         else:
@@ -249,15 +256,35 @@ def stop_pipeline():
 
 @app.get("/api/dashboard/health")
 def get_dashboard_health():
+    # Load real data if available
+    summaries = []
+    if os.path.exists("data/summaries/latest_summaries.json"):
+        try:
+            with open("data/summaries/latest_summaries.json", "r") as f:
+                summaries = json.load(f)
+        except:
+            pass
+
+    # Calculate real score based on sentiment
+    score = 72 # default
+    if summaries:
+        negative_count = sum(1 for s in summaries if s.get('sentiment') == 'negative')
+        positive_count = sum(1 for s in summaries if s.get('sentiment') == 'positive')
+        total = len(summaries)
+        if total > 0:
+            # Simple score: 100 - (negative_ratio * 100) + (positive_ratio * 20)
+            score = int(80 - (negative_count / total * 40) + (positive_count / total * 20))
+            score = max(0, min(100, score))
+
     # Return dynamic message based on status
     status_msg = "System is idle and ready for analysis."
     if job_status["is_running"]:
         status_msg = f"Currently {job_status['current_phase']} reviews..."
     elif job_status["status_message"].startswith("Success"):
-        status_msg = "Latest analysis complete. All metrics up to date."
+        status_msg = f"Latest analysis complete. {len(summaries)} themes identified."
 
     return {
-        "score": 72,
+        "score": score,
         "trend": "+8%",
         "trend_direction": "up",
         "comparison": "vs last 7 days",
@@ -266,7 +293,36 @@ def get_dashboard_health():
 
 @app.get("/api/dashboard/themes")
 def get_dashboard_themes():
-    # These are the results of the LAST successful run
+    # Load real data if available
+    if os.path.exists("data/summaries/latest_summaries.json"):
+        try:
+            with open("data/summaries/latest_summaries.json", "r") as f:
+                summaries = json.load(f)
+                
+            # Map ThemeSummary to Dashboard Theme format
+            mapped_themes = []
+            icons = {
+                "negative": "report_problem",
+                "positive": "verified_user",
+                "mixed": "analytics"
+            }
+            
+            for i, s in enumerate(summaries):
+                mapped_themes.append({
+                    "id": i + 1,
+                    "title": s.get("theme_name"),
+                    "description": s.get("problem_statement")[:100] + "...",
+                    "icon": icons.get(s.get("sentiment"), "insights"),
+                    "trend": "CRITICAL" if s.get("impact_level") == "High" else "STABLE",
+                    "trend_type": "critical" if s.get("sentiment") == "negative" else "positive",
+                    "users_affected": s.get("review_count"),
+                    "recommendations": s.get("product_recommendations", [])
+                })
+            return mapped_themes
+        except Exception as e:
+            print(f"Error loading themes: {e}")
+
+    # Fallback to placeholders if no file exists
     return [
         {"id": 1, "title": "KYC Verification Delays", "description": "Users report 3-5 day waits for KYC approval.", "icon": "verified_user", "trend": "+31%", "trend_type": "critical", "users_affected": 23},
         {"id": 2, "title": "UPI Payment Failures", "description": "Transaction failures on SIP auto-debit.", "icon": "account_balance", "trend": "+19%", "trend_type": "critical", "users_affected": 18},

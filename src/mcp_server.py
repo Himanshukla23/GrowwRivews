@@ -69,7 +69,7 @@ def append_to_doc(report_text: str, doc_id: str = "") -> str:
 
 @mcp.tool()
 def send_summary_email(
-    doc_link: str,
+    doc_link: str = "",
     product_name: str = "Groww",
     theme_count: int = 0,
     recipient: str = "",
@@ -93,7 +93,7 @@ def send_summary_email(
     try:
         from src.phase_6.gmail_delivery import send_summary_email as _send
         success = _send(
-            doc_link=doc_link,
+            doc_link=doc_link if doc_link else None,
             product_name=product_name,
             theme_count=theme_count,
             recipient=recipient if recipient else None,

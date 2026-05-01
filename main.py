@@ -54,10 +54,18 @@ def main():
         
         # Save a local copy for review
         import os
+        import json
         os.makedirs("data/summaries", exist_ok=True)
         with open("data/summaries/latest_report.md", "w", encoding="utf-8") as f:
             f.write(report_md)
+        
+        # Save structured summaries for dashboard
+        summaries_json = [s.to_dict() for s in summaries]
+        with open("data/summaries/latest_summaries.json", "w", encoding="utf-8") as f:
+            json.dump(summaries_json, f, indent=2)
+            
         print(f"\n[Phase 4] Local copy saved to: data/summaries/latest_report.md")
+        print(f"[Phase 4] Structured summaries saved to: data/summaries/latest_summaries.json")
 
     # Phase 5: Deliver to Google Docs
     doc_url = None
@@ -74,7 +82,7 @@ def main():
             print("  Report is still available in console above.")
 
     # Phase 6: Send notification email
-    if args.mode == "full" and doc_url:
+    if args.mode == "full":
         try:
             from src.phase_6.gmail_delivery import send_summary_email
             send_summary_email(

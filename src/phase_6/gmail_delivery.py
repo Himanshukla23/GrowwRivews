@@ -17,20 +17,12 @@ from src.google_auth_helper import get_google_credentials
 load_dotenv()
 
 
-def _build_email_html(product_name: str, doc_link: str, theme_count: int) -> str:
+def _build_email_html(product_name: str, doc_link: Optional[str], theme_count: int) -> str:
     """Builds a concise, professional HTML email body."""
     date_str = datetime.now().strftime("%B %d, %Y")
 
-    return f"""
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #00B386, #00D09C); padding: 24px; border-radius: 8px 8px 0 0;">
-            <h2 style="color: white; margin: 0;">📊 Weekly Product Pulse</h2>
-            <p style="color: rgba(255,255,255,0.9); margin: 4px 0 0 0;">{product_name} — {date_str}</p>
-        </div>
-        <div style="background: #f9f9f9; padding: 24px; border: 1px solid #e0e0e0;">
-            <p>Hi Team,</p>
-            <p>The weekly review analysis for <strong>{product_name}</strong> is ready.
-               We identified <strong>{theme_count} key themes</strong> from user feedback this week.</p>
+    if doc_link:
+        link_html = f"""
             <p style="text-align: center; margin: 24px 0;">
                 <a href="{doc_link}"
                    style="background: #00B386; color: white; padding: 12px 32px;
@@ -38,6 +30,25 @@ def _build_email_html(product_name: str, doc_link: str, theme_count: int) -> str
                     View Full Report →
                 </a>
             </p>
+        """
+    else:
+        link_html = f"""
+            <p style="text-align: center; margin: 24px 0; color: #666; font-style: italic;">
+                (Detailed Google Doc report link was not generated)
+            </p>
+        """
+
+    return f"""
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #00B386, #00D09C); padding: 24px; border-radius: 8px 8px 0 0;">
+            <h2 style="color: white; margin: 0; text-transform: uppercase; letter-spacing: 1px;">Weekly Product Pulse</h2>
+            <p style="color: rgba(255,255,255,0.9); margin: 4px 0 0 0; font-weight: bold;">{product_name} Intelligence Report — {date_str}</p>
+        </div>
+        <div style="background: #f9f9f9; padding: 24px; border: 1px solid #e0e0e0;">
+            <p>Hi Team,</p>
+            <p>The weekly review analysis for <strong>{product_name}</strong> is ready.
+               We identified <strong>{theme_count} key themes</strong> from user feedback this week.</p>
+            {link_html}
             <p style="color: #666; font-size: 13px;">
                 This report was generated automatically by the Weekly Product Pulse System.
             </p>
@@ -47,7 +58,7 @@ def _build_email_html(product_name: str, doc_link: str, theme_count: int) -> str
 
 
 def send_summary_email(
-    doc_link: str,
+    doc_link: Optional[str] = None,
     product_name: str = "Groww",
     theme_count: int = 0,
     recipient: Optional[str] = None,
@@ -90,8 +101,9 @@ def send_summary_email(
     plain_body = (
         f"Weekly Product Pulse Report for {product_name} is ready.\n"
         f"Themes detected: {theme_count}\n"
-        f"View the full report: {doc_link}\n"
     )
+    if doc_link:
+        plain_body += f"View the full report: {doc_link}\n"
 
     # HTML body
     html_body = _build_email_html(product_name, doc_link, theme_count)
