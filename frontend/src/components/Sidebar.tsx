@@ -1,10 +1,44 @@
 "use client";
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { getApiUrl } from '@/lib/api';
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [isRunning, setIsRunning] = useState(false);
+
+  const fetchStatus = async () => {
+    try {
+      const res = await fetch(getApiUrl('/api/status'));
+      if (res.ok) {
+        const data = await res.json();
+        setIsRunning(data.is_running);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleRunPipeline = async () => {
+    if (isRunning) return;
+    setIsRunning(true);
+    try {
+      await fetch(getApiUrl('/api/generate-report'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product: 'Groww', min_cluster: 20, max_themes: 7 })
+      });
+      fetchStatus();
+    } catch (error) {
+      console.error("Failed to run pipeline:", error);
+      setIsRunning(false);
+    }
+  };
 
   const navItems = [
     { name: 'Dashboard', icon: 'dashboard', href: '/' },
@@ -64,9 +98,19 @@ export function Sidebar() {
       </div>
       
       <div className="mt-auto">
-        <button className="w-full bg-primary text-white py-4 rounded-2xl font-label-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-transform">
-          <span className="material-symbols-outlined text-sm">play_arrow</span>
-          Run Pipeline
+        <button 
+          onClick={handleRunPipeline}
+          disabled={isRunning}
+          className={`w-full py-4 rounded-2xl font-label-lg flex items-center justify-center gap-2 shadow-lg transition-transform ${
+            isRunning 
+              ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+              : 'bg-primary text-white shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]'
+          }`}
+        >
+          <span className={`material-symbols-outlined text-sm ${isRunning ? 'animate-spin' : ''}`}>
+            {isRunning ? 'sync' : 'play_arrow'}
+          </span>
+          {isRunning ? 'Generating...' : 'Run Pipeline'}
         </button>
       </div>
     </aside>

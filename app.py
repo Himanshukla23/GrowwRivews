@@ -17,7 +17,7 @@ app = FastAPI(title="GrowwPulse API")
 @app.on_event("startup")
 def startup_event():
     # Reconstruct Google Credentials from environment variables (used in Fly.io deployment)
-    if not os.path.exists("credentials.json") and "GOOGLE_CREDENTIALS_BASE64" in os.environ:
+    if "GOOGLE_CREDENTIALS_BASE64" in os.environ:
         try:
             creds_json = base64.b64decode(os.environ["GOOGLE_CREDENTIALS_BASE64"]).decode('utf-8')
             with open("credentials.json", "w") as f:
@@ -27,7 +27,7 @@ def startup_event():
             print(f"[Startup] Failed to reconstruct credentials.json: {e}")
             
     os.makedirs("data", exist_ok=True)
-    if not os.path.exists("data/google_token.json") and "GOOGLE_TOKEN_BASE64" in os.environ:
+    if "GOOGLE_TOKEN_BASE64" in os.environ:
         try:
             token_json = base64.b64decode(os.environ["GOOGLE_TOKEN_BASE64"]).decode('utf-8')
             with open("data/google_token.json", "w") as f:

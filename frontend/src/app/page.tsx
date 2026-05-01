@@ -234,36 +234,32 @@ export default function Dashboard() {
                 <h3 className="font-headline-md text-on-surface">AI Action Items</h3>
               </div>
               <div className="space-y-6">
-                <div className="flex gap-4 p-4 rounded-2xl bg-surface-container-low border border-transparent hover:border-primary/20 transition-colors">
-                  <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-error text-white">
-                    <span className="material-symbols-outlined text-sm">priority_high</span>
-                  </div>
-                  <div>
-                    <p className="font-label-lg text-on-surface mb-1">Fix KYC Verification Pipeline</p>
-                    <p className="text-label-md text-slate-500 mb-2">28% of negative reviews cite KYC delays {'>'} 3 days.</p>
-                    <span className="px-2 py-0.5 bg-error-container text-on-error-container text-[10px] font-bold rounded uppercase">High Priority</span>
-                  </div>
-                </div>
-                <div className="flex gap-4 p-4 rounded-2xl bg-surface-container-low border border-transparent hover:border-primary/20 transition-colors">
-                  <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-amber-500 text-white">
-                    <span className="material-symbols-outlined text-sm">warning</span>
-                  </div>
-                  <div>
-                    <p className="font-label-lg text-on-surface mb-1">Investigate UPI SIP Auto-Debit</p>
-                    <p className="text-label-md text-slate-500 mb-2">19% increase in UPI mandate failure complaints.</p>
-                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded uppercase">Medium Priority</span>
-                  </div>
-                </div>
-                <div className="flex gap-4 p-4 rounded-2xl bg-surface-container-low border border-transparent hover:border-primary/20 transition-colors">
-                  <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-primary text-white">
-                    <span className="material-symbols-outlined text-sm">lightbulb</span>
-                  </div>
-                  <div>
-                    <p className="font-label-lg text-on-surface mb-1">Prioritize Dark Mode Release</p>
-                    <p className="text-label-md text-slate-500 mb-2">26% feature requests. High correlation with 5-star reviews.</p>
-                    <span className="px-2 py-0.5 bg-secondary-container text-primary text-[10px] font-bold rounded uppercase">Opportunity</span>
-                  </div>
-                </div>
+                {themes.length > 0 ? (
+                  themes.slice(0, 3).map((theme, idx) => (
+                    <div key={idx} className="flex gap-4 p-4 rounded-2xl bg-surface-container-low border border-transparent hover:border-primary/20 transition-colors">
+                      <div className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full ${
+                        theme.trend_type === 'critical' ? 'bg-error' : 'bg-amber-500'
+                      } text-white`}>
+                        <span className="material-symbols-outlined text-sm">
+                          {theme.trend_type === 'critical' ? 'priority_high' : 'warning'}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-label-lg text-on-surface mb-1">
+                          {theme.recommendations?.[0] || `Investigate ${theme.title}`}
+                        </p>
+                        <p className="text-label-md text-slate-500 mb-2">{theme.description}</p>
+                        <span className={`px-2 py-0.5 ${
+                          theme.trend_type === 'critical' ? 'bg-error-container text-on-error-container' : 'bg-amber-100 text-amber-700'
+                        } text-[10px] font-bold rounded uppercase`}>
+                          {theme.trend_type === 'critical' ? 'High Priority' : 'Medium Priority'}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-slate-400 text-center py-8">No action items yet. Run the pipeline to generate insights.</p>
+                )}
               </div>
             </div>
           </div>

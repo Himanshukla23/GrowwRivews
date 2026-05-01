@@ -79,25 +79,34 @@ class EmbeddingClient:
         """
         Retrieves embeddings for a list of texts, using cache when available.
         """
-        embeddings = []
-        texts_to_embed = []
+        embeddings = [None] * len(texts)
         indices_to_embed = []
+        texts_to_embed = []
         
+        expected_dim = None
+
+        # 1. Load from cache
         for i, text in enumerate(texts):
             cache_path = self._get_cache_path(text)
             if os.path.exists(cache_path):
                 try:
                     with open(cache_path, 'rb') as f:
-                        embeddings.append(pickle.load(f))
+                        emb = pickle.load(f)
+                        if emb is not None and isinstance(emb, (list, np.ndarray)):
+                            embeddings[i] = emb
+                            if expected_dim is None:
+                                expected_dim = len(emb)
+                        else:
+                            indices_to_embed.append(i)
+                            texts_to_embed.append(text)
                 except:
-                    embeddings.append(None)
-                    texts_to_embed.append(text)
                     indices_to_embed.append(i)
+                    texts_to_embed.append(text)
             else:
-                embeddings.append(None)
-                texts_to_embed.append(text)
                 indices_to_embed.append(i)
+                texts_to_embed.append(text)
         
+        # 2. Embed missing texts
         if texts_to_embed:
             print(f"Embedding {len(texts_to_embed)} new texts...")
             if self.use_openai:
@@ -105,18 +114,47 @@ class EmbeddingClient:
             elif self.use_gemini:
                 new_embeddings = self._embed_gemini(texts_to_embed)
             else:
-                new_embeddings = self._embed_tfidf(texts_to_embed)
+                new_embeddings = self._embed_tfidf(texts_to_embed, dim=expected_dim or 384)
             
+            # Ensure new_embeddings is a list of the same length as texts_to_embed
+            if len(new_embeddings) != len(texts_to_embed):
+                print(f"Warning: Expected {len(texts_to_embed)} embeddings, got {len(new_embeddings)}. Filling with zeros.")
+                # This shouldn't happen with correct logic, but adding as safety
+                
             for i, (idx, emb) in enumerate(zip(indices_to_embed, new_embeddings)):
                 cache_path = self._get_cache_path(texts_to_embed[i])
-                with open(cache_path, 'wb') as f:
-                    pickle.dump(emb, f)
+                try:
+                    with open(cache_path, 'wb') as f:
+                        pickle.dump(emb, f)
+                except:
+                    pass
                 embeddings[idx] = emb
+                if expected_dim is None and emb is not None:
+                    expected_dim = len(emb)
+
+        # 3. Final validation and conversion
+        # Filter out any None values that might have slipped through
+        valid_embeddings = []
+        if expected_dim is None:
+            expected_dim = 384 # Default fallback
+
+        for i, emb in enumerate(embeddings):
+            if emb is None or not isinstance(emb, (list, np.ndarray)) or len(emb) == 0:
+                valid_embeddings.append([0.0] * expected_dim)
+            elif len(emb) != expected_dim:
+                # Dimension mismatch (likely due to model change)
+                # Pad or truncate to match expected_dim
+                if len(emb) > expected_dim:
+                    valid_embeddings.append(emb[:expected_dim])
+                else:
+                    valid_embeddings.append(list(emb) + [0.0] * (expected_dim - len(emb)))
+            else:
+                valid_embeddings.append(emb)
                 
-        return np.array(embeddings)
+        return np.array(valid_embeddings, dtype=np.float32)
 
     def _embed_local(self, texts: List[str]) -> np.ndarray:
-        return np.array(self._embed_tfidf(texts))
+        return np.array(self._embed_tfidf(texts), dtype=np.float32)
 
     def _embed_openai(self, texts: List[str]) -> List[List[float]]:
         response = self.client.embeddings.create(
@@ -128,7 +166,6 @@ class EmbeddingClient:
     def _embed_gemini(self, texts: List[str]) -> List[List[float]]:
         import google.generativeai as genai
         import time
-        # Gemini handles batches natively but has limits. Batch size 100 max per request.
         all_embeddings = []
         batch_size = 50
         for i in range(0, len(texts), batch_size):
@@ -142,31 +179,50 @@ class EmbeddingClient:
                         content=batch,
                         task_type="clustering"
                     )
-                    if isinstance(result['embedding'][0], list):
-                        all_embeddings.extend(result['embedding'])
+                    # Result['embedding'] can be a list of lists or a single list (if batch size 1)
+                    embs = result.get('embedding', [])
+                    
+                    if len(batch) == 1:
+                        # If batch was 1, it might return [x, y, z] instead of [[x, y, z]]
+                        if embs and not isinstance(embs[0], (list, np.ndarray)):
+                            all_embeddings.append(embs)
+                        else:
+                            all_embeddings.extend(embs)
                     else:
-                        all_embeddings.append(result['embedding'])
+                        all_embeddings.extend(embs)
+                        
                     success = True
-                    # Respect free tier rate limits (~15 RPM)
-                    time.sleep(4)
+                    if len(texts) > batch_size:
+                        time.sleep(2) # Reduced sleep but kept for safety
                 except Exception as e:
                     if "429" in str(e) or "quota" in str(e).lower():
                         retries -= 1
-                        print(f"Quota/Rate limit hit. Waiting 10 seconds before retry... ({retries} retries left)")
-                        time.sleep(10)
+                        print(f"Quota/Rate limit hit. Waiting 5 seconds... ({retries} retries left)")
+                        time.sleep(5)
                     else:
-                        raise e
+                        print(f"Gemini Error: {e}")
+                        break # Break retry loop
+            
             if not success:
-                print("Gemini API quota exhausted! Falling back to lightweight TF-IDF embeddings.")
-                return self._embed_tfidf(texts)
+                print("Batch failed. Falling back to TF-IDF for this batch.")
+                # Fallback for just this batch to maintain overall list length
+                batch_tfidf = self._embed_tfidf(batch, dim=768)
+                all_embeddings.extend(batch_tfidf)
+        
         return all_embeddings
 
-    def _embed_tfidf(self, texts: List[str]) -> List[List[float]]:
+    def _embed_tfidf(self, texts: List[str], dim: int = 384) -> List[List[float]]:
         from sklearn.feature_extraction.text import TfidfVectorizer
-        print("Running TF-IDF Vectorizer as a fallback (Zero RAM, Zero API cost)...")
-        # Use 384 dimensions to match sentence-transformers output shape roughly
-        vectorizer = TfidfVectorizer(max_features=384, stop_words='english')
-        return vectorizer.fit_transform(texts).toarray().tolist()
+        print(f"Running TF-IDF Vectorizer fallback (dim={dim})...")
+        vectorizer = TfidfVectorizer(max_features=dim, stop_words='english')
+        X = vectorizer.fit_transform(texts).toarray()
+        
+        # If TF-IDF found fewer features than requested dim, pad with zeros
+        if X.shape[1] < dim:
+            padding = np.zeros((X.shape[0], dim - X.shape[1]))
+            X = np.hstack((X, padding))
+            
+        return X.tolist()
 
 def get_db_connection(db_path="data/audit_log.db"):
     # Ensure directory exists before connecting

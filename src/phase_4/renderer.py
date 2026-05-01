@@ -91,17 +91,6 @@ def _detect_audiences(summaries: List[ThemeSummary]) -> List[str]:
 
 
 # ---------------------------------------------------------------------------
-# Sentiment Emoji Helper
-# ---------------------------------------------------------------------------
-
-_SENTIMENT_ICON = {
-    "positive": "🟢",
-    "negative": "🔴",
-    "mixed":    "🟡",
-}
-
-
-# ---------------------------------------------------------------------------
 # Core Renderer
 # ---------------------------------------------------------------------------
 
@@ -112,19 +101,8 @@ def render_report(
     total_reviews: int = 0,
 ) -> str:
     """
-    Render a professional, PII-free Markdown report from theme summaries.
-
-    The report is designed to be ≤ 250 words so it stays scannable for
-    busy stakeholders.
-
-    Args:
-        summaries: List of ThemeSummary from Phase 3.
-        product_name: Product name for the header.
-        week_id: ISO week identifier (e.g. "2026-W17"). Auto-generated if None.
-        total_reviews: Total number of reviews analyzed (pre-filter count).
-
-    Returns:
-        A complete Markdown string ready for Google Docs or email.
+    Render a professional, corporate-grade Markdown report.
+    Focuses on strategic intelligence and operational impact.
     """
     if week_id is None:
         now = datetime.now()
@@ -132,88 +110,77 @@ def render_report(
 
     date_str = datetime.now().strftime("%B %d, %Y")
 
-    # --- Header ---
+    # --- Header Section ---
     lines = [
-        f"# 📊 Weekly Product Pulse — {product_name}",
-        f"**Subtitle:** Week {week_id} | {date_str}  ",
+        f"# Product Intelligence Report: {product_name}",
+        f"**Reporting Period:** Week {week_id} | **Date:** {date_str}  ",
         "",
-        "### 📝 Overview",
-        f"This week's analysis of **{total_reviews} user reviews** highlights **{len(summaries)} key areas of focus** for the {product_name} platform.",
+        "## 1. Executive Summary",
+        f"Analysis of **{total_reviews} feedback entries** identifying **{len(summaries)} key intelligence themes**.",
+        "This report prioritizes systemic friction points based on volume and operational impact.",
         "",
-        "### 📈 Key Metrics",
-        f"- **Total Reviews Analyzed:** {total_reviews}",
-        f"- **Top Themes Detected:** {len(summaries)} Primary Issues",
+        "## 2. Key Intelligence Metrics",
+        f"- **Total Analysis Volume:** {total_reviews} items",
+        f"- **Thematic Density:** {len(summaries)} active themes",
     ]
 
-    # --- Who This Helps ---
+    # --- Stakeholder Mapping ---
     audiences = _detect_audiences(summaries)
-    lines.append(f"- **Primary Stakeholders:** {', '.join(audiences)}")
+    lines.append(f"- **Primary Distribution:** {', '.join(audiences)}")
     lines.append("")
     lines.append("---")
     lines.append("")
-    lines.append("## 🔍 Top Issues & Themes")
+    lines.append("## 3. Detailed Strategic Analysis")
     lines.append("")
 
-    # --- Theme Sections (top 5 by review count) ---
+    # --- Thematic Breakdown ---
     sorted_summaries = sorted(summaries, key=lambda s: s.review_count, reverse=True)
     top_themes = sorted_summaries[:5]
 
-    lines.append("---")
-    lines.append("")
-
     for idx, s in enumerate(top_themes, 1):
-        icon = _SENTIMENT_ICON.get(s.sentiment, "⚪")
-        safe_theme = _scrub_pii(s.theme_name)
-        safe_problem = _scrub_pii(s.problem_statement)
-        safe_why = _scrub_pii(s.why_this_matters)
-        impact = s.impact_level
+        safe_theme = _scrub_pii(s.theme_name).upper()
+        sentiment = s.sentiment.upper()
+        priority = "URGENT" if s.impact_level.lower() == "high" else s.impact_level.upper()
 
-        # Add warning icon if high impact
-        impact_icon = "⚠️ " if impact.lower() == "high" else ""
-
-        lines.append(f"### {icon} {idx}. {safe_theme} ({s.review_count} reviews)")
-        lines.append(f"**Problem Statement:** {safe_problem}")
+        lines.append(f"### {idx}. {safe_theme} ({s.review_count} cases)")
+        lines.append(f"**Thematic Summary:** {_scrub_pii(s.problem_statement)}")
         lines.append("")
-        lines.append(f"**💡 Why this matters:**")
-        lines.append(f"{safe_why}")
+        lines.append(f"**Strategic Context:**")
+        lines.append(f"{_scrub_pii(s.why_this_matters)}")
         lines.append("")
-        lines.append(f"**{impact_icon}Impact Level:** {impact}")
+        lines.append(f"**Operational Impact:** {priority} | **Sentiment:** {sentiment}")
         lines.append("")
 
-        # Product Recommendations
+        # Action Items
         if s.product_recommendations:
-            lines.append("**🎯 Product Recommendations:**")
+            lines.append("**Recommended Action Plan:**")
             for item in s.product_recommendations[:2]:
-                safe_item = _scrub_pii(item)
-                lines.append(f"- {safe_item}")
+                lines.append(f"- {_scrub_pii(item)}")
             lines.append("")
 
-        # Quotes
+        # User Voices
         if s.quotes:
-            lines.append("**🗣️ User Voices:**")
+            lines.append("**Direct Stakeholder Feedback:**")
             for q in s.quotes[:2]:
-                safe_quote = _scrub_pii(q.text)
-                lines.append(f'> *"{safe_quote}"*')
+                lines.append(f'> *"{_scrub_pii(q.text)}"*')
             lines.append("")
 
         lines.append("---")
         lines.append("")
 
-    # --- Remaining themes as a compact list ---
+    # --- Secondary Observations ---
     remaining = sorted_summaries[5:]
     if remaining:
-        lines.append("---")
-        lines.append("")
-        lines.append("### Other Themes")
+        lines.append("## 4. Secondary Observations")
         for s in remaining:
-            icon = _SENTIMENT_ICON.get(s.sentiment, "⚪")
             safe_theme = _scrub_pii(s.theme_name)
-            lines.append(f"- {icon} **{safe_theme}** ({s.review_count} reviews)")
+            lines.append(f"- **{safe_theme}** ({s.review_count} cases)")
         lines.append("")
 
     # --- Footer ---
     lines.append("---")
-    lines.append(f"*Generated by Weekly Product Pulse System — {date_str}*")
+    lines.append(f"*Document generated by Pulse Intelligence Systems | {date_str}*")
+    lines.append("*Confidential - For Internal Distribution Only*")
 
     report = "\n".join(lines)
     return report
