@@ -317,7 +317,30 @@ def run_clustering_pipeline(
         )
     else:
         # Fallback to DBSCAN if hdbscan is missing
-        clusterer = DBSCAN(eps=0.55, min_samples=3)
+        # Dynamically search for the optimal eps that returns multiple distinct themes!
+        best_eps = 0.45
+        max_found_clusters = 0
+        for test_eps in [0.42, 0.44, 0.45, 0.46, 0.48]:
+            test_clusterer = DBSCAN(eps=test_eps, min_samples=3)
+            test_clusters = test_clusterer.fit_predict(reduced_embeddings)
+            test_n = len(set(test_clusters)) - (1 if -1 in test_clusters else 0)
+            if test_n >= 3 and test_n <= 9: # We want between 3 and 9 themes
+                best_eps = test_eps
+                max_found_clusters = test_n
+                break
+        
+        # In case none found between 3 and 9, try to find the one with the maximum clusters
+        if max_found_clusters == 0:
+            for test_eps in [0.42, 0.44, 0.45, 0.46, 0.48, 0.5]:
+                test_clusterer = DBSCAN(eps=test_eps, min_samples=3)
+                test_clusters = test_clusterer.fit_predict(reduced_embeddings)
+                test_n = len(set(test_clusters)) - (1 if -1 in test_clusters else 0)
+                if test_n > max_found_clusters:
+                    best_eps = test_eps
+                    max_found_clusters = test_n
+
+        clusterer = DBSCAN(eps=best_eps, min_samples=3)
+        print(f"Optimal DBSCAN eps selected dynamically: {best_eps} (found {max_found_clusters} clusters)")
 
     clusters = clusterer.fit_predict(reduced_embeddings)
     df['cluster'] = clusters
