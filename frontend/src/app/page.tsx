@@ -15,10 +15,10 @@ export default function Dashboard() {
     const fetchData = async () => {
       try {
         const [healthRes, themesRes, feedRes, statusRes] = await Promise.all([
-          fetch(getApiUrl('/api/dashboard/health')),
-          fetch(getApiUrl('/api/dashboard/themes')),
-          fetch(getApiUrl('/api/dashboard/feed')),
-          fetch(getApiUrl('/api/status'))
+          fetch(getApiUrl('/api/dashboard/health'), { cache: 'no-store' }),
+          fetch(getApiUrl('/api/dashboard/themes'), { cache: 'no-store' }),
+          fetch(getApiUrl('/api/dashboard/feed'), { cache: 'no-store' }),
+          fetch(getApiUrl('/api/status'), { cache: 'no-store' })
         ]);
         
         if (healthRes.ok) setHealth(await healthRes.json());

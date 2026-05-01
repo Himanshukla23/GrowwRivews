@@ -12,13 +12,13 @@ export function Sidebar() {
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch(getApiUrl('/api/status'));
+      const res = await fetch(getApiUrl('/api/status'), { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setIsRunning(data.is_running);
       }
       
-      const themesRes = await fetch(getApiUrl('/api/dashboard/themes'));
+      const themesRes = await fetch(getApiUrl('/api/dashboard/themes'), { cache: 'no-store' });
       if (themesRes.ok) {
         const themesData = await themesRes.json();
         if (Array.isArray(themesData)) {
